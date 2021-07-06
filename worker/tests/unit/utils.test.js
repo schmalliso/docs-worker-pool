@@ -11,10 +11,7 @@ const metaObject = {
   ]
 };
 
-const publishedBranchObject = {
-  repoOwner: 'mongodb',
-  repoName: 'docs-bi-connector'
-};
+const repoName = "docs-bi-connector";
 
 describe('Mongo Tests', () => {
   let connection;
@@ -102,14 +99,11 @@ describe('Mongo Tests', () => {
     expect(repos[0]).toHaveProperty('repos');
   });
 
-  it('get published branches for each repo', async () => {
-    const pubBranches = await workerUtils.getRepoPublishedBranches(
-      publishedBranchObject
-    );
+  it('get branchInfo for a repo', async () => {
+    const pubBranches = await workerUtils.getRepoBranches(repoName);
     expect(pubBranches).toBeDefined();
     expect(pubBranches).toBeInstanceOf(Object);
-    expect(pubBranches).toHaveProperty('status', 'success');
-    expect(pubBranches).toHaveProperty('content');
-    expect(pubBranches.content).toBeInstanceOf(Object);
+    expect(pubBranches).toHaveProperty('prefix', 'versioned');
+    expect(pubBranches.versioned).toBeInstanceOf(Boolean);
   });
 });

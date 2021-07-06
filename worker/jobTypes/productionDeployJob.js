@@ -20,21 +20,6 @@ async function verifyUserEntitlements (currentJob) {
   return false;
 }
 
-async function verifyBranchConfiguredForPublish (currentJob) {
-  const repoObject = {
-    repoOwner: currentJob.payload.repoOwner, repoName: currentJob.payload.repoName
-  };
-  const repoContent = await workerUtils.getRepoPublishedBranches(repoObject);
-  if (repoContent && repoContent.status === 'success') {
-    const publishedBranches = repoContent.content.git.branches.published;
-    //if this is stable branch AND [its the primary alias OR no aliases exist], then we want to use this build's manifest for global search
-    currentJob.payload["stableBranch"] = (repoContent.content.version.stable === currentJob.payload.branchName && (currentJob.payload.primaryAlias || ! currentJob.payload.aliased) )   ? '-g' : "";
-    return publishedBranches.includes(currentJob.payload.branchName);
-  }
-
-  return false;
-}
-
 // anything that is passed to an exec must be validated or sanitized
 // we use the term sanitize here lightly -- in this instance this // ////validates
 function safeString (stringToCheck) {
@@ -111,13 +96,9 @@ async function pushToProduction (publisher, logger) {
 }
 
 async function runGithubProdPush (currentJob) {
-  const ispublishable = await verifyBranchConfiguredForPublish(currentJob);
+
   const userIsEntitled = await verifyUserEntitlements(currentJob);
 
-  if (!ispublishable) {
-    workerUtils.logInMongo(currentJob, `${'(BUILD)'.padEnd(15)} You are trying to run in production a branch that is not configured for publishing`)
-    throw new Error('entitlement failed');
-  }
   if (!userIsEntitled) {
     workerUtils.logInMongo(currentJob, `${'(BUILD)'.padEnd(15)} failed, you are not entitled to build or deploy (${currentJob.payload.repoOwner}/${currentJob.payload.repoName}) for ${currentJob.payload.branchName} branch`);
     throw new Error('entitlement failed');
@@ -155,7 +136,6 @@ module.exports = {
   startGithubBuild,
   runGithubProdPush,
   safeGithubProdPush,
-  verifyBranchConfiguredForPublish,
   verifyUserEntitlements,
   pushToProduction
 };

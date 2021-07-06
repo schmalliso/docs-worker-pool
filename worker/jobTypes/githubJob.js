@@ -3,6 +3,7 @@ const workerUtils = require('../utils/utils');
 const simpleGit = require('simple-git/promise');
 const request = require('request');
 const utils = require('../utils/utils');
+const { getRepoBranches } = require('../utils/utils');
 
 
 class GitHubJobClass {
@@ -53,24 +54,25 @@ class GitHubJobClass {
     }
     async constructPrefix(isProdDeployJob){    
       try{
-        //download published branches file to retrieve prefix and check if repo is versioned 
-        const repoObject = {
-          repoOwner: this.currentJob.payload.repoOwner, repoName: this.currentJob.payload.repoName,
-        };
-        const repoContent = await workerUtils.getRepoPublishedBranches(repoObject)
-        const server_user = await workerUtils.getServerUser()
-        let pathPrefix; 
+        // check the repo's entry in the db to see if it is versioned
 
+        const branchInfo = getRepoBranches(this.currentJob.payload.repoName)
+        const versioned = branchInfo["versioned"]
+        const prefix = branchInfo["repo_branches"]["prefix"]
+        const server_user = await workerUtils.getServerUser()
+        
+        let pathPrefix;
+        
+        // prefix is constructed by front-end for staging jobs -- construct prefix for deploy jobs now
         if(isProdDeployJob){
           //versioned repo
-          if(repoContent && repoContent.content.version.active.length > 1){
-            pathPrefix = `${repoContent.content.prefix}/${ this.currentJob.payload.alias ? this.currentJob.payload.alias : this.currentJob.payload.branchName}`; 
-        }
+          if(versioned){
+            pathPrefix = `${prefix}/${ this.currentJob.payload.alias ? this.currentJob.payload.alias : this.currentJob.payload.branchName}`; 
+          }
           //non versioned repo
           else{
-            pathPrefix = `${this.currentJob.payload.alias ? this.currentJob.payload.alias :  repoContent.content.prefix}`;
+            pathPrefix = `${prefix}`;
           }
-
         }
         //mut only expects prefix or prefix/version for versioned repos, have to remove server user from staging prefix
         if(typeof pathPrefix !== 'undefined' && pathPrefix !== null){
@@ -88,7 +90,7 @@ class GitHubJobClass {
     async applyPatch(patch, currentJobDir) {
         //create patch file
         try {
-          await fs.writeFileSync(`repos/${currentJobDir}/myPatch.patch`, patch, { encoding: 'utf8', flag: 'w' });
+          fs.writeFileSync(`repos/${currentJobDir}/myPatch.patch`, patch, { encoding: 'utf8', flag: 'w' });
           
         } catch (error) {
             console.log('Error creating patch ', error);
@@ -318,8 +320,6 @@ class GitHubJobClass {
         await gatsbyAdapter.initEnv();
       }
 
-      // staging jobs do not need to retrieve the published branches yaml file for front-end
-      // thus why the series of makefile targets are slightly different btwn prod and staging jobs
       if (this.buildNextGen() && !isProdDeployJob) {
         commandsToBuild[commandsToBuild.length - 1] = 'make next-gen-html';
         //tell Gatsby to pull in draft data from CMS

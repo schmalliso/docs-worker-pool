@@ -207,27 +207,22 @@ module.exports = {
 
   },
 
-  async getRepoPublishedBranches(repoObject) {
-    const pubBranchesFile = `https://raw.githubusercontent.com/mongodb/docs-worker-pool/meta/publishedbranches/${repoObject.repoName}.yaml`;
-    const returnObject = {};
-    return new Promise(function(resolve, reject) {
-      request(pubBranchesFile, function(error, response, body) {
-        if (!error && body && response.statusCode === 200) {
-          try {
-            const yamlParsed = yaml.safeLoad(body);
-            returnObject['status'] = 'success';
-            returnObject['content'] = yamlParsed;
-          } catch (e) {
-            console.log('ERROR parsing yaml file!', repoObject, e);
-            returnObject['status'] = 'failure';
-            reject(error);
-          }
-        } else {
-          returnObject['status'] = 'failure';
-          returnObject['content'] = response;
-        }
-        resolve(returnObject);
-      });
-    });
+  async getRepoBranches(repoName) {
+    try{
+      let returnObject = {}
+      let versioned = false
+      const query = { "repoName": repoName };
+      const repo_branches = await mongo.getBranchesCollection().find(query)
+      if (repo_branches["branches"].length > 1) {
+        versioned = true
+      }
+      returnObject["versioned"] = versioned
+      returnObject["repo_branches"] = repo_branches
+      
+      return returnObject;
+    } catch (error) {
+      console.error('Error retrieving branch information', error)
+      throw error
+    }
   }
 };
